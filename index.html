@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<!--
+		This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Rafa's Simple Looper</title>
+  <style type='text/css'>
+ul{
+list-style:none;
+}
+#recordingslist audio{
+margin-bottom:0;
+}
+#recordingslist a{
+color:#fff;
+background-color:#f00;
+cursor:pointer;
+}
+#menu button:first-letter{
+text-decoration:underline;
+}
+#menu button{
+width:64px;
+height:24px;
+}
+#init{
+background-color:#ff0;
+border:1px solid #000;
+font-weight:bold;
+}
+#init:disabled{
+background-color:#ffa;
+border:1px solid #ccc;
+font-weight:normal;
+}
+#start{
+background-color:#6c6;
+border:1px solid #000;
+font-weight:bold;
+}
+#start:disabled{
+background-color:#3d3;
+border:1px solid #ccc;
+color:#666;
+font-weight:normal;
+}
+#stop{
+background-color:#d00;
+border:1px solid #000;
+font-weight:bold;
+}
+#stop:disabled{
+background-color:#d66;
+border:1px solid #ccc;
+color:#666;
+font-weight:normal;
+}
+
+  </style>
+</head>
+<body>
+
+  <h1>Simple Looper</h1>
+
+	<ol>
+	<li>Click <strong>init</strong> (or press "<strong>i</strong>")</li>
+	<li>Click <strong>record</strong> (or press "<strong>r</strong>") to start a loop</li>
+	<li>Click <strong>stop</strong> (or press "<strong>s</strong>") to play the loop</li>
+	<li>Goto <strong>2</strong> to create a new loop</li>
+	</ol>
+
+	<div id="menu">
+  <button onclick="init(this);" id="init" accesskey="i" title="shortcut-key: i">init</button>
+  <button onclick="startR(this);" id="start" accesskey="r" title="shortcut-key: r" disabled>record</button>
+  <button onclick="stopRecording(this);" id="stop" accesskey="s" title="shortcut-key: s" disabled>stop</button>
+	</div>
+  
+  <h2>Loops</h2>
+  <ul id="recordingslist"></ul>
+  
+  <h2>Log</h2>
+  <pre id="log"></pre>
+
+<script>
+	let audios = [];
+	let volume = .5;
+		
+	let init_bt = document.getElementById("init");
+	let start_bt = document.getElementById("start");
+	let stop_bt = document.getElementById("stop");
+
+	document.addEventListener('keypress', (e) => {
+		if (e.key == "i" && init_bt.disabled != true)
+			init(init_bt);
+		if (e.key == "r" && start_bt.disabled != true)
+			startR(start_bt);
+		if (e.key == "s" && stop_bt.disabled != true)
+			stopRecording(stop_bt);
+	});
+
+  function __log(e, data) {
+    log.innerHTML += "\n" + e + " " + (data || '');
+  }
+
+  let audio_context;
+  let recorder;
+
+	function startR (element) {
+		setTimeout(function() {
+			startRecording(element)
+		}, 200);
+	}
+
+  function startUserMedia(stream) {
+    let input = audio_context.createMediaStreamSource(stream);
+    __log('Media stream created.');
+
+    recorder = new Recorder(input);
+    __log('Recorder initialised.');
+  }
+
+  function startRecording(button) {
+    recorder && recorder.record();
+    button.disabled = true;
+    button.nextElementSibling.disabled = false;
+    __log('Recording...');
+  }
+
+  function stopRecording(button) {
+    recorder && recorder.stop();
+    button.disabled = true;
+    button.previousElementSibling.disabled = false;
+    __log('Stopped recording.');
+    
+    createLoop();
+    
+    recorder.clear();
+  }
+
+  function createLoop() {
+    recorder && recorder.exportWAV(function(blob) {
+      let url = URL.createObjectURL(blob);
+      let li = document.createElement('li');
+      let au = document.createElement('audio');
+      let hf = document.createElement('a');
+      
+      au.controls = true;
+      au.src = url;
+			au.volume = volume;
+			au.onended = function () {
+				au.play();
+			}
+
+			audios.push(au);
+
+      hf.innerHTML = "[ X ]";
+			hf.onclick = function () {
+				li.remove();
+			}
+
+      li.appendChild(au);
+      li.appendChild(hf);
+      recordingslist.appendChild(li);
+
+			for (let i = 0; i < audios.length; i++){
+				audios[i].currentTime = 0;
+				audios[i].play();
+			}
+    });
+  }
+
+  function init(button) {
+    try {
+      // webkit shim
+      window.AudioContext = window.AudioContext || window.webkitAudioContext;
+      navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia;
+      window.URL = window.URL || window.webkitURL;
+      
+      audio_context = new AudioContext;
+      __log('Audio context set up.');
+      __log('navigator.getUserMedia ' + (navigator.getUserMedia ? 'available.' : 'not present!'));
+
+    	button.disabled = true;
+			start_bt.disabled = false;
+    } catch (e) {
+      alert('No web audio support in this browser!');
+    }
+    
+    navigator.getUserMedia({audio: true}, startUserMedia, function(e) {
+      __log('No live audio input: ' + e);
+    });
+  };
+  </script>
+
+  <script src="recorder.js"></script>
+</body>
+</html>
